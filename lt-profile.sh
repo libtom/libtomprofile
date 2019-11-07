@@ -66,8 +66,8 @@ if [ -z $analyze ]; then
     make -C "$ltc" timing -j9 EXTRALIBS="$ltm/libtommath.a" CFLAGS="-DUSE_LTM -DLTM_DESC -DTIMING_DONT_MAKE_KEY -I$ltm" $ltc_debug V=0
     pushd "$ltc"
     branch=$(echo $b | tr '/\\' '_')
-    ./timing rsa > "$results_dir"/rsa-"$branch".csv
-    ./timing ecc > "$results_dir"/ecc-"$branch".csv
+    ./timing rsa > "$results_dir"/rsa_"$branch".csv
+    ./timing ecc > "$results_dir"/ecc_"$branch".csv
     popd
   done
 fi
