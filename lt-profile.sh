@@ -4,6 +4,8 @@ set -e
 
 readonly ltc="../libtomcrypt"
 readonly ltm="../libtommath"
+readonly tfm="../tomsfastmath"
+readonly tfm_headers="$tfm/src/headers"
 readonly results_dir="$(readlink -f "$(date +%y%m%d%H%M)")"
 
 declare -a ltm_branches
@@ -12,9 +14,11 @@ analyze=
 check_git=1
 ltc_debug=
 ltm_debug=
+tfm_cflags=
+tfm_lib=
 gnuplot_terminal="svg enhanced background rgb 'white'"
 
-while getopts dfhpa:c:m: opt
+while getopts dfhpta:c:m: opt
 do
   case $opt in
     a)  analyze="$OPTARG";;
@@ -23,7 +27,9 @@ do
         ltm_debug="COMPILE_DEBUG=1";;
     m)  ltm_branches+=("$OPTARG");;
     p)  gnuplot_terminal="png";;
-    h|?)  printf "Usage: %s: [-dfhp] [-a directory] [-m ltm-branch [-m ...]]\n\n" $0
+    t)  tfm_cflags="-DTFM_DESC -I$tfm_headers"
+        tfm_lib="$tfm/libtfm.a";;
+    h|?)  printf "Usage: %s: [-dfhpt] [-a directory] [-m ltm-branch [-m ...]]\n\n" $0
         printf "    -a directory    Analyze the results of a previous run from the\n"
         printf "                    'directory' given.\n"
         printf "                    This only analyzes the results.\n"
@@ -32,7 +38,7 @@ do
         printf "    -h              This help.\n"
         printf "    -m ltm-branch   Add a libtommath branch that should be processed.\n"
         printf "    -p              Generate PNG's instead of SVG's.\n"
-        printf "                                                                       \n"
+        printf "    -t              Also test against TomsFastMath.\n"
         printf "\n"
         exit 2;;
   esac
@@ -56,6 +62,10 @@ _check_git "$ltm"
 
 if [ -z $analyze ]; then
   mkdir -p "$results_dir"
+  if [ ! -z "$tfm_cflags" ]; then
+    make -C "$tfm" clean
+    make -C "$tfm" -j9
+  fi
   analyze="$results_dir"
   for b in "${ltm_branches[@]}"
   do
@@ -63,14 +73,28 @@ if [ -z $analyze ]; then
     make -C "$ltm" clean
     make -C "$ltm" -j9
     touch "$ltc"/demos/timing.c
-    make -C "$ltc" timing -j9 EXTRALIBS="$ltm/libtommath.a" CFLAGS="-DUSE_LTM -DLTM_DESC -DTIMING_DONT_MAKE_KEY -I$ltm" $ltc_debug V=0
+    make -C "$ltc" timing -j9 EXTRALIBS="$ltm/libtommath.a $tfm_lib" CFLAGS="-DUSE_LTM -DLTM_DESC -DTIMING_DONT_MAKE_KEY -I$ltm $tfm_cflags" $ltc_debug V=0
     pushd "$ltc"
     branch=$(echo $b | tr '/\\' '_')
     ./timing rsa > "$results_dir"/rsa_"$branch".csv
     ./timing ecc > "$results_dir"/ecc_"$branch".csv
     popd
   done
+  if [ ! -z "$tfm_cflags" ]; then
+    touch "$ltc"/demos/timing.c
+    make -C "$ltc" timing -j9 EXTRALIBS="$ltm/libtommath.a $tfm_lib" CFLAGS="-DUSE_TFM -DLTM_DESC -DTIMING_DONT_MAKE_KEY -I$ltm $tfm_cflags" $ltc_debug V=0
+    pushd "$ltc"
+    branch=$(echo $b | tr '/\\' '_')
+    ./timing rsa > ../libtomprofile/"$analyze"/rsa_tfm.csv
+    ./timing ecc > ../libtomprofile/"$analyze"/ecc_tfm.csv
+    popd
+  fi
 fi
+
+if [ ! -z "$tfm_cflags" ]; then
+  ltm_branches+=("tfm")
+fi
+
 
 for alg in ecc rsa
 do
