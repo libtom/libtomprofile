@@ -95,6 +95,7 @@ if [ ! -z "$tfm_cflags" ]; then
   ltm_branches+=("tfm")
 fi
 
+mkdir -p "$analyze"/images
 
 for alg in ecc rsa
 do
@@ -115,7 +116,7 @@ set ylabel "Cycles per Operation"
 set xlabel "Operand size (bits)"
 set title "${algop}"
 
-set output "${alg}_${op}.${gnuplot_terminal%% *}"
+set output "${analyze}/images/${alg}_${op}.${gnuplot_terminal%% *}"
 $plotstring
 EOF
   done
